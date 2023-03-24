@@ -9,8 +9,10 @@ import com.hmdp.mapper.VoucherOrderMapper;
 import com.hmdp.service.ISeckillVoucherService;
 import com.hmdp.service.IVoucherOrderService;
 import com.hmdp.utils.RedisIdWorker;
+import com.hmdp.utils.SimpleRedisLock;
 import com.hmdp.utils.UserHolder;
 import org.springframework.aop.framework.AopContext;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,6 +32,9 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
 
     @Resource
     private RedisIdWorker redisIdWorker;
+
+    @Resource
+    private StringRedisTemplate stringRedisTemplate;
 
     @Override
     public Result seckillVoucher(Long voucherId) {
@@ -56,10 +61,22 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         如果这些请求被分配到不同的JVM实例中，那么每个JVM实例都会创建自己的锁对象，这样就无法起到同步的作用。
         因此，在集群高并发模式下，使用synchronized关键字需要格外注意，需要考虑到分布式环境下的并发问题。所以需要分布式锁。
          */
-        synchronized (userId.toString().intern()) {
-            //拿到代理对象
+//        synchronized (userId.toString().intern()) {
+//            //拿到代理对象
+//            IVoucherOrderService proxy = (IVoucherOrderService) AopContext.currentProxy();
+//            return proxy.crearVoucherOrder(voucherId);
+//        }
+        SimpleRedisLock lock = new SimpleRedisLock("order:" + userId, stringRedisTemplate);
+        boolean success = lock.tryLock(100);
+        if (!success) {
+            return Result.fail("一人限购一单");
+        }
+        //拿到代理对象
+        try {
             IVoucherOrderService proxy = (IVoucherOrderService) AopContext.currentProxy();
             return proxy.crearVoucherOrder(voucherId);
+        } finally {
+            lock.unlock();
         }
     }
 
@@ -74,7 +91,7 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
             return Result.fail("限购一单");
         }
         //更新秒杀卷库存
-        //乐观锁解决超卖问题，将stock作为version
+        //乐观锁解决超卖问题，将stock作为version,cas法
         //悲观锁执行慢，而乐观锁执行成功率低
         boolean success = seckillVoucherService.update().setSql("stock = stock - 1").eq("voucher_id", voucherId).gt("stock", 0).update();
         if (!success) {
