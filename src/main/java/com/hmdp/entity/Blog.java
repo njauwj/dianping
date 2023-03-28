@@ -42,6 +42,7 @@ public class Blog implements Serializable {
     private Long userId;
     /**
      * 用户图标
+     * TableField(exist = false) 用于指示MyBatis-Plus不要将该字段映射到数据库表中
      */
     @TableField(exist = false)
     private String icon;
@@ -51,6 +52,11 @@ public class Blog implements Serializable {
     @TableField(exist = false)
     private String name;
 
+    /**
+     * 是否点赞,返回前端的一个标识，如果点赞了，高亮显示。
+     */
+    @TableField(exist = false)
+    private Boolean isLike;
     /**
      * 标题
      */
