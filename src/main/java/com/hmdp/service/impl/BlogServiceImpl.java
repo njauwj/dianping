@@ -1,37 +1,30 @@
 package com.hmdp.service.impl;
 
-import cn.hutool.core.util.BooleanUtil;
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.hmdp.dto.Result;
+import com.hmdp.dto.ScrollResult;
 import com.hmdp.dto.UserDTO;
 import com.hmdp.entity.Blog;
+import com.hmdp.entity.Follow;
 import com.hmdp.entity.User;
 import com.hmdp.mapper.BlogMapper;
 import com.hmdp.service.IBlogService;
+import com.hmdp.service.IFollowService;
 import com.hmdp.service.IUserService;
 import com.hmdp.utils.SystemConstants;
 import com.hmdp.utils.UserHolder;
-import com.sun.org.apache.xpath.internal.operations.Bool;
-import org.springframework.data.redis.core.SetOperations;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
-
-import java.time.Instant;
-import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import static com.hmdp.utils.RedisConstants.BLOG_LIKED_KEY;
+import static com.hmdp.utils.RedisConstants.BLOG_STOCK_KEY;
 
 /**
  * <p>
@@ -49,6 +42,10 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
 
     @Resource
     private StringRedisTemplate stringRedisTemplate;
+
+    @Resource
+    private IFollowService followService;
+
 
     /*
     查询博客
@@ -138,6 +135,84 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
                 })
                 .collect(Collectors.toList());
         return Result.ok(userDTOs);
+    }
+
+    /**
+     * 获取博主的笔记
+     *
+     * @param id      博主ID
+     * @param current 当前页码
+     * @return 博客列表
+     */
+    @Override
+    public Result getUserBlog(Long id, Integer current) {
+        Page<Blog> page = new Page<>(current, SystemConstants.MAX_PAGE_SIZE);
+        List<Blog> blogList = query().eq("user_id", id).page(page).getRecords();
+        return Result.ok(blogList);
+    }
+
+    /**
+     * 保存博客 并推送给关注我的人
+     *
+     * @param blog 博客
+     * @return 博客Id
+     */
+    @Override
+    public Result saveBlog(Blog blog) {
+        // 获取登录用户
+        UserDTO user = UserHolder.getUser();
+        Long userId = user.getId();
+        blog.setUserId(userId);
+        // 保存探店博文
+        save(blog);
+        // 返回id
+        Long blogId = blog.getId();
+        List<Follow> followList = followService.query().eq("user_id", userId).list();
+        ZSetOperations<String, String> ops = stringRedisTemplate.opsForZSet();
+        for (Follow follow : followList) {
+            //推送博客
+            Long id = follow.getFollowUserId();
+            String key = BLOG_STOCK_KEY + id;
+            ops.add(key, blogId.toString(), System.currentTimeMillis());
+        }
+        return Result.ok(blogId);
+    }
+
+    /**
+     * 推送博客
+     *
+     * @param lastId 当前时间戳 : minTime
+     * @param offset 偏移量 第一次为0
+     * @return 博客列表
+     */
+    @Override
+    public Result followBlog(Long lastId, Integer offset) {
+        Long loginUserId = UserHolder.getUser().getId();
+        String key = BLOG_STOCK_KEY + loginUserId;
+        Set<ZSetOperations.TypedTuple<String>> tupleSet = stringRedisTemplate.opsForZSet().reverseRangeByScoreWithScores(key, 0, lastId, offset, 3);
+        if (tupleSet == null || tupleSet.isEmpty()) {
+            return Result.ok();
+        }
+        //减少扩容机制，提升性能
+        List<Long> blogIds = new ArrayList<>(tupleSet.size());
+        int os = 1;
+        long minTime = 0;
+        for (ZSetOperations.TypedTuple<String> tuple : tupleSet) {
+            //时间戳
+            long curTime = tuple.getScore().longValue();
+            if (curTime == minTime) {
+                os++;
+            } else {
+                minTime = curTime;
+                os = 1;
+            }
+            //博客ID
+            blogIds.add(Long.valueOf(tuple.getValue()));
+        }
+        List<Blog> blogList = blogIds.stream().map(this::getById).collect(Collectors.toList());
+        blogList.forEach(this::handleBlog);
+        ScrollResult scrollResult = new ScrollResult(blogList, minTime, os);
+        return Result.ok(scrollResult);
     }
 
     public void handleBlog(Blog blog) {

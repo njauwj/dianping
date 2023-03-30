@@ -29,8 +29,6 @@ public class BlogController {
 
     @Resource
     private IBlogService blogService;
-    @Resource
-    private IUserService userService;
 
     @GetMapping("/{id}")
     public Result getBlog(@PathVariable Long id) {
@@ -39,13 +37,7 @@ public class BlogController {
 
     @PostMapping
     public Result saveBlog(@RequestBody Blog blog) {
-        // 获取登录用户
-        UserDTO user = UserHolder.getUser();
-        blog.setUserId(user.getId());
-        // 保存探店博文
-        blogService.save(blog);
-        // 返回id
-        return Result.ok(blog.getId());
+        return blogService.saveBlog(blog);
     }
 
     @PutMapping("/like/{id}")
@@ -58,7 +50,6 @@ public class BlogController {
     public Result blogLikedList(@PathVariable Long id) {
         return blogService.blogLikedList(id);
     }
-
 
 
     @GetMapping("/of/me")
@@ -76,5 +67,15 @@ public class BlogController {
     @GetMapping("/hot")
     public Result queryHotBlog(@RequestParam(value = "current", defaultValue = "1") Integer current) {
         return blogService.queryHotBlogs(current);
+    }
+
+    @GetMapping("/of/user")
+    public Result getUserBlog(Long id, Integer current) {
+        return blogService.getUserBlog(id, current);
+    }
+
+    @GetMapping("/of/follow")
+    public Result followBlog(Long lastId, @RequestParam(defaultValue = "0") Integer offset) {
+        return blogService.followBlog(lastId, offset);
     }
 }

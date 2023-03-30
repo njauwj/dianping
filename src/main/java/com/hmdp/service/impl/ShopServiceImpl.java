@@ -63,7 +63,6 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
         }
         //有缓存判断缓存是否过期
         RedisData redisData = JSONUtil.toBean(s, RedisData.class);
-        //todo ? 这里为什么不能直接转为 Shop 类型呢
         JSONObject data = (JSONObject) redisData.getData();
         Shop shop = JSONUtil.toBean(data, Shop.class);
         LocalDateTime expireTime = redisData.getExpireTime();

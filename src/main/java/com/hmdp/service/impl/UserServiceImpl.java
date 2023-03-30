@@ -12,11 +12,13 @@ import com.hmdp.entity.User;
 import com.hmdp.mapper.UserMapper;
 import com.hmdp.service.IUserService;
 import com.hmdp.utils.RegexUtils;
+import com.hmdp.utils.UserHolder;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
+import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpSession;
 import java.util.HashMap;
 import java.util.Map;
@@ -59,6 +61,14 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         log.debug("发送短信验证码成功，验证码:{}", code);
         //返回ok
         return Result.ok();
+    }
+
+    @Override
+    public Result logout(HttpServletRequest request) {
+        String token = request.getHeader("authorization");
+        String key = LOGIN_USER_KEY + token;
+        stringRedisTemplate.opsForHash().delete(key,"id","icon","nickName");
+        return Result.ok("退出登录");
     }
 
     @Override
