@@ -33,8 +33,7 @@ public class SimpleRedisLock implements ILock {
         // 获取线程标示,Thread.currentThread().getId()在集群模式下可能会重复，
         //用它作为 value 可能会出现风险,所以前面拼上UUID
         String threadId = ID_PREFIX + Thread.currentThread().getId();
-        // 获取锁,setNx 过程中要保持 设置key 和 过期时间的原子性，不然就可能出现key设置上了
-        //服务器宕机了，过期时间没设置上导致死锁
+        // 获取锁,setNx 过程中要保持 设置key 和 过期时间的原子性，不然就可能出现key设置上了服务器宕机了，过期时间没设置上导致死锁
         Boolean success = stringRedisTemplate.opsForValue()
                 .setIfAbsent(KEY_PREFIX + name, threadId, timeoutSec, TimeUnit.SECONDS);
         return Boolean.TRUE.equals(success);

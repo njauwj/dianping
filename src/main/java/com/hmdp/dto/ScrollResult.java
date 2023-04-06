@@ -7,7 +7,7 @@ import java.util.List;
 /**
  * @author: wj
  * @create_time: 2023/3/30 10:57
- * @explain:
+ * @explain: 推送博客
  */
 @Data
 public class ScrollResult {

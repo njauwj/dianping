@@ -47,6 +47,7 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
         if (shop == null) {
             return Result.fail("店铺不存在");
         }
+
         return Result.ok(shop);
     }
 
@@ -126,7 +127,7 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
                 //有缓存直接返回
                 return JSONUtil.toBean(cache, Shop.class);
             }
-            if (cache != null) {
+            if (cache != null) {//不存在的数据
                 return null;
             }
             //缓存为空时拿到锁准备进行缓存更新
@@ -185,7 +186,7 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
             //有缓存直接返回
             return JSONUtil.toBean(cache, Shop.class);
         }
-        if (cache != null) {//表示数据库和缓存中都不存在该数据
+        if (cache != null) {//表示数据库和缓存中都不存在该数据,请求的是不存在的数据
             return null;
         }
         //缓存没有则查询数据库

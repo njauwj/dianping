@@ -20,7 +20,6 @@ import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 import static com.hmdp.utils.RedisConstants.BLOG_LIKED_KEY;
@@ -110,9 +109,10 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
         return Result.ok(records);
     }
 
-    /*
-    获取点赞用户列表
-    不可能全部显示，显示前几名即可
+    /**
+     * 点赞排行榜
+     * @param id 博客ID
+     * @return
      */
     @Override
     public Result blogLikedList(Long id) {
@@ -189,6 +189,7 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
     public Result followBlog(Long lastId, Integer offset) {
         Long loginUserId = UserHolder.getUser().getId();
         String key = BLOG_STOCK_KEY + loginUserId;
+        //记录上次查询的时间lastId
         Set<ZSetOperations.TypedTuple<String>> tupleSet = stringRedisTemplate.opsForZSet().reverseRangeByScoreWithScores(key, 0, lastId, offset, 3);
         if (tupleSet == null || tupleSet.isEmpty()) {
             return Result.ok();

@@ -39,6 +39,16 @@ public class VoucherServiceImpl extends ServiceImpl<VoucherMapper, Voucher> impl
         LambdaQueryWrapper<Voucher> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(shopId > 0, Voucher::getShopId, shopId);
         List<Voucher> vouchers = this.list(queryWrapper);
+        for (Voucher voucher : vouchers) {
+            Long voucherId = voucher.getId();
+            SeckillVoucher seckillVoucher = seckillVoucherService.getById(voucherId);
+            if (seckillVoucher == null) {
+                continue;
+            }
+            voucher.setBeginTime(seckillVoucher.getBeginTime());
+            voucher.setEndTime(seckillVoucher.getEndTime());
+            voucher.setStock(seckillVoucher.getStock());
+        }
         return Result.ok(vouchers);
     }
 

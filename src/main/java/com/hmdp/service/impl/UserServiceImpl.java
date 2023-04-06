@@ -14,13 +14,17 @@ import com.hmdp.service.IUserService;
 import com.hmdp.utils.RegexUtils;
 import com.hmdp.utils.UserHolder;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.connection.BitFieldSubCommands;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpSession;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
@@ -67,8 +71,57 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
     public Result logout(HttpServletRequest request) {
         String token = request.getHeader("authorization");
         String key = LOGIN_USER_KEY + token;
-        stringRedisTemplate.opsForHash().delete(key,"id","icon","nickName");
+        stringRedisTemplate.opsForHash().delete(key, "id", "icon", "nickName");
         return Result.ok("退出登录");
+    }
+
+    /**
+     * 用户签到
+     *
+     * @return
+     */
+    @Override
+    public Result sign() {
+        Long id = UserHolder.getUser().getId();
+        LocalDateTime now = LocalDateTime.now();
+        String suffix = now.format(DateTimeFormatter.ofPattern(":yyyyMM"));
+        int dayOfMonth = now.getDayOfMonth();
+        String key = SIGN_KEY + id + suffix;
+        stringRedisTemplate.opsForValue().setBit(key, dayOfMonth - 1, true);
+
+        return Result.ok();
+    }
+
+    /**
+     * 用户连续签到次数
+     *
+     * @return
+     */
+    @Override
+    public Result signCount() {
+        Long id = UserHolder.getUser().getId();
+        LocalDateTime now = LocalDateTime.now();
+        String suffix = now.format(DateTimeFormatter.ofPattern(":yyyyMM"));
+        int dayOfMonth = now.getDayOfMonth();
+        String key = SIGN_KEY + id + suffix;
+        List<Long> list = stringRedisTemplate.opsForValue().bitField(key, BitFieldSubCommands.create().get(BitFieldSubCommands.BitFieldType.unsigned(dayOfMonth)).valueAt(0));
+        if (list == null || list.isEmpty()) {
+            return Result.ok(0);
+        }
+        Long signNum = list.get(0);
+        if (signNum == null || signNum == 0L) {
+            return Result.ok(0);
+        }
+        int count = 0;
+        while (true) {
+            if ((signNum & 1) == 0) {
+                break;
+            } else {
+                count++;
+            }
+            signNum = signNum >>> 1;
+        }
+        return Result.ok(count);
     }
 
     @Override

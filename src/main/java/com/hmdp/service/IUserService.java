@@ -25,4 +25,8 @@ public interface IUserService extends IService<User> {
     Result sedCode(String phone, HttpSession session);
 
     Result logout(HttpServletRequest request);
+
+    Result sign();
+
+    Result signCount();
 }

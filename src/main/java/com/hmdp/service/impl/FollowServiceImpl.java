@@ -58,7 +58,7 @@ public class FollowServiceImpl extends ServiceImpl<FollowMapper, Follow> impleme
             queryWrapper.eq(Follow::getUserId, userId).eq(Follow::getFollowUserId, loginUserId);
             boolean success = remove(queryWrapper);
             if (success) {
-                stringRedisTemplate.opsForSet().remove(key);
+                stringRedisTemplate.opsForSet().remove(key, userId.toString());
             }
         } else {
             Follow follow = new Follow();
